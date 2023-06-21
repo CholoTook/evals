@@ -12,11 +12,13 @@ class FuzzyMatch(evals.Eval):
         completion_fns: list[CompletionFn],
         samples_jsonl: str,
         *args,
+        does_not_match: bool = False,
         max_tokens: int = 100,
         **kwargs,
     ):
         super().__init__(completion_fns, *args, **kwargs)
         assert len(completion_fns) == 1, "FuzzyMatch only supports one completion fn"
+        self.does_not_match = does_not_match
         self.max_tokens = max_tokens
         self.samples_jsonl = samples_jsonl
 
@@ -38,10 +40,19 @@ class FuzzyMatch(evals.Eval):
         )
         sampled = result.get_completions()[0]
 
-        matches = [utils.fuzzy_match(sampled, correct_answer) for correct_answer in correct_answers]
+        matches = [
+            utils.fuzzy_match(sampled, correct_answer)
+            for correct_answer in correct_answers
+        ]
+
+        matched = True in matches
+
+        if self.does_not_match:
+            matched = not matched
+            matches = [not match for match in matches]
 
         evals.record.record_match(
-            True in matches,
+            matched,
             expected=correct_answers,
             picked=[sampled for i in range(len(correct_answers)) if matches[i]],
         )
